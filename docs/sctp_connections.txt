@@ -1,0 +1,9 @@
+State    Recv-Q Send-Q  Local Address:Port  Peer Address:Port Process                                 
+UNCONN   0      0          127.0.10.2:44823  127.0.1.100:38412 users:(("srscu",pid=19230,fd=10))      
+`- ESTAB 0      0       127.0.10.2%lo:44823  127.0.1.100:38412 users:(("srscu",pid=19230,fd=10))      
+LISTEN   0      4096       127.0.10.1:38472      0.0.0.0:*     users:(("srscu",pid=19230,fd=6))       
+`- ESTAB 0      0       127.0.10.1%lo:38472   127.0.10.2:54629 users:(("srscu",pid=19230,fd=6))       
+UNCONN   0      0          127.0.10.2:54629   127.0.10.1:38472 users:(("srsdu",pid=29710,fd=7))       
+`- ESTAB 0      0       127.0.10.2%lo:54629   127.0.10.1:38472 users:(("srsdu",pid=29710,fd=7))       
+ESTAB    0      0         127.0.1.100:38412   127.0.10.2:44823 users:(("open5gs-amfd",pid=2227,fd=33))
+`- ESTAB 0      0      127.0.1.100%lo:38412   127.0.10.2:44823 users:(("open5gs-amfd",pid=2227,fd=33))

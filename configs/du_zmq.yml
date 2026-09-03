@@ -1,0 +1,34 @@
+# Example config for a DU with one 20MHz TDD cell using a USRP as RF frontend.
+f1ap:
+  cu_cp_addr: 127.0.10.1
+  bind_addr: 127.0.10.2
+nru:
+  bind_addr: 127.0.0.2
+
+ru_sdr:
+  device_driver: zmq
+  device_args: tx_port=tcp://127.0.0.1:2000,rx_port=tcp://127.0.0.1:2001
+  srate: 23.04
+  tx_gain: 80
+  rx_gain: 40
+
+cell_cfg:
+  dl_arfcn: 368500
+  band: 3
+  channel_bandwidth_MHz: 20
+  common_scs: 15
+  plmn: "99970"
+  tac: 7
+  pci: 1
+
+log:
+  filename: /tmp/du.log
+  all_level: warning
+
+pcap:
+  mac_enable: false
+  mac_filename: /tmp/du_mac.pcap
+  f1ap_enable: true
+  f1ap_filename: /tmp/du_f1ap.pcap
+  f1u_enable: false
+  f1u_filename: /tmp/du_f1u.pcap

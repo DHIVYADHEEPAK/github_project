@@ -1,0 +1,38 @@
+===== srsRAN CU =====
+
+--== srsRAN CU (commit ef4b0749a1) ==--
+
+srsRAN 5G CU version 24.10.1 (ef4b0749a1)
+
+===== srsRAN DU =====
+
+--== srsRAN DU (commit ef4b0749a1) ==--
+
+srsRAN 5G DU version 24.10.1 (ef4b0749a1)
+
+===== UERANSIM =====
+v3.3.0
+
+===== Wireshark =====
+Wireshark 3.6.2 (Git v3.6.2 packaged as 3.6.2-2)
+
+===== Open5GS =====
+ii  open5gs:amd64                              2.8.0~jammy5                                     amd64        5G Core and EPC (metapackage)
+ii  open5gs-amf:amd64                          2.8.0~jammy5                                     amd64        AMF (Access and Mobility Management Function)
+ii  open5gs-ausf:amd64                         2.8.0~jammy5                                     amd64        AUSF (Authentication Server Function)
+ii  open5gs-bsf:amd64                          2.8.0~jammy5                                     amd64        BSF (Binding Support Function)
+ii  open5gs-common:amd64                       2.8.0~jammy5                                     amd64        5G Core and EPC (Shared Files)
+ii  open5gs-hss:amd64                          2.8.0~jammy5                                     amd64        HSS (Home Subscriber Server)
+ii  open5gs-mme:amd64                          2.8.0~jammy5                                     amd64        MME (Mobility Management Entity)
+ii  open5gs-nrf:amd64                          2.8.0~jammy5                                     amd64        NRF (Network Repository Function)
+ii  open5gs-nssf:amd64                         2.8.0~jammy5                                     amd64        NSSF (Network Slice Selection Function)
+ii  open5gs-pcf:amd64                          2.8.0~jammy5                                     amd64        PCF (Policy Control Function)
+ii  open5gs-pcrf:amd64                         2.8.0~jammy5                                     amd64        PCRF (Policy and Charging Rules Function)
+ii  open5gs-scp:amd64                          2.8.0~jammy5                                     amd64        SCP (Network Repository Function)
+ii  open5gs-sepp:amd64                         2.8.0~jammy5                                     amd64        SEPP (Security Edge Protection Proxy)
+ii  open5gs-sgwc:amd64                         2.8.0~jammy5                                     amd64        SGW-C (Serving Gateway - Control Plane)
+ii  open5gs-sgwu:amd64                         2.8.0~jammy5                                     amd64        SGW-U (Serving Gateway - User Plane)
+ii  open5gs-smf:amd64                          2.8.0~jammy5                                     amd64        SMF (Session Management Function)
+ii  open5gs-udm:amd64                          2.8.0~jammy5                                     amd64        UDM (Unified Data Management)
+ii  open5gs-udr:amd64                          2.8.0~jammy5                                     amd64        UDR (Unified Data Repository)
+ii  open5gs-upf:amd64                          2.8.0~jammy5                                     amd64        UPF (User Plane Function)

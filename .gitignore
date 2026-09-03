@@ -1,0 +1,18 @@
+# Local/private UE configuration
+open5gs-ue.yaml
+ 
+# Temporary packet capture
+*.tmp
+*.pcapng
+ 
+# Runtime logs
+*.log
+ 
+# Python cache
+__pycache__/
+*.pyc
+ 
+# OS/editor files
+.DS_Store
+*.swp
+ 
