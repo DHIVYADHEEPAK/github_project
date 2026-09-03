@@ -1,81 +1,114 @@
 # Slot 15 — O-RAN CU–DU Split Testbed: F1 Interface Message Analysis
 
-A hands-on 5G RAN testbed built to disaggregate the gNB into CU and DU components per the O-RAN split architecture, and to capture and read the F1AP setup signalling that the two components exchange over F1-C. The DU is driven over a ZMQ virtual radio link, the core is a full Open5GS deployment, and the UE side is exercised with UERANSIM (with a parallel srsUE/4G run kept for comparison).
+A CU/DU-split gNB testbed built with srsRAN Project (commit `ef4b0749a1`) running against a ZMQ virtual RF, backed by a full Open5GS core, with UERANSIM/srsUE used as the UE side. The goal was to capture and analyse F1AP signalling — both the F1 Setup procedure between CU and DU, and (as a stretch goal) UE-context signalling once a UE attaches.
 
-This repo documents the deployment, the config issues that came up, and a byte-level read of the captured F1AP `F1SetupRequest` / `F1SetupResponse` exchange.
-
-## What's actually in this testbed
-
-| Component | Role | Binary / Service |
-|---|---|---|
-| Open5GS | 5GC (AMF, SMF, UPF, AUSF, UDM, NRF, SCP, SEPP, BSF, plus legacy SGW-C/U, MME for the LTE comparison run) | `open5gs-*d` systemd services |
-| srsRAN Project (`release_24_10_1`, commit `ef4b0749a1`) | gNB split into CU-CP/CU-UP and DU | `apps/cu/srscu`, `apps/du/srsdu` |
-| ZMQ virtual RF | Loopback RF between DU and UE, no SDR needed | `libsrsran_rf_zmq.so` |
-| UERANSIM | NR UE simulator | `nr-ue`, configs for open5gs / free5gc / custom |
-| srsRAN_4G (`srsue`) | LTE UE, used in a side-by-side attach test over ZMQ | `srsue/src/srsue` |
-| Wireshark / tcpdump | F1AP + SCTP capture and dissection | `f1ap_live.pcap`, `f1u_live.pcap` |
-
-Everything runs on loopback (`127.0.10.x` for F1, `127.0.1.100` / `127.0.0.x` for N2 and the 5GC internal SBI/Diameter interfaces) on a single Ubuntu host — no physical RAN hardware involved, which is the point of the ZMQ split.
-
-## Repo layout
+## Repository structure
 
 ```
-.
+github_project/
 ├── README.md
-├── docs/
-│   ├── PROJECT_REPORT.md      # full write-up: deployment notes + F1AP analysis
-│   └── REFERENCES.md
+├── .gitignore
 ├── configs/
-│   ├── cu.yml                 # CU-CP/CU-UP config used against Open5GS
-│   ├── du_zmq.yml             # DU config, ZMQ RF, n78 cell
-│   └── ue_zmq.conf.snippet    # srsue ZMQ carrier settings (LTE comparison run)
-└── captures/
-    └── README.md              # what f1ap_live.pcap / f1u_live.pcap contain, filters used
+│   ├── cu.yml                     # CU-CP config (F1-C + N2/AMF)
+│   ├── du_zmq.yml                 # DU config, ZMQ virtual RF
+│   ├── amf.yaml                   # Open5GS AMF config
+│   └── open5gs-ue.example.yaml    # UE subscriber profile, credentials redacted
+├── captures/
+│   └── f1ap_live.pcap             # SCTP + F1AP capture (F1SetupRequest/Response)
+└── docs/
+    ├── f1c_sctp_connection.txt    # SCTP association evidence
+    ├── f1ap_packet_summary.txt    # tshark/wireshark packet summary
+    ├── network_ports.txt          # ss/netstat listener evidence
+    ├── sctp_connections.txt       # SCTP endpoint state
+    └── software_versions.txt      # srsRAN commit, Open5GS version, UERANSIM version
 ```
+
+## What's running
+
+| Component | Role | Address |
+|---|---|---|
+| Open5GS AMF | 5G core, N2 termination | `127.0.1.100:38412` |
+| srsRAN CU (`srscu`) | CU-CP: F1-C termination, N2 to AMF | F1-C on `127.0.10.1` |
+| srsRAN DU (`srsdu`) | DU: F1-C client, ZMQ-backed cell | F1-C client at `127.0.10.2`, PHY over ZMQ |
+| UERANSIM / srsUE | UE simulator over ZMQ | ZMQ TCP ports `2000`/`2001` |
+| Wireshark / tcpdump | F1AP + SCTP capture | loopback, F1-C port |
 
 ## Setup
 
-### 1. Core network — Open5GS
-Open5GS was installed as systemd services and left running as the full NF set (AMF, AUSF, BSF, MME, NRF, NSSF, SCP, SEPP, SGW-C, SGW-U, SMF, UDM, UPF):
+### 1. Core network
+Open5GS is deployed as systemd services with the AMF config at `configs/amf.yaml`. The AMF's N2 SCTP socket comes up on `127.0.1.100:38412`, verified with `ss -lnp | grep sctp` before anything RAN-side is started.
 
-```bash
-sudo systemctl --type=service --state=running | grep open5gs
+### 2. CU
+`configs/cu.yml` is the actual config used:
+
+```yaml
+cu_cp:
+  amf:
+    addr: 127.0.1.100
+    port: 38412
+    bind_addr: 127.0.10.2
+    supported_tracking_areas:
+      - tac: 7
+        plmn_list:
+          - plmn: "99970"
+            tai_slice_support_list:
+              - sst: 1
+  f1ap:
+    bind_addr: 127.0.10.1
+
+cu_up:
+  nru:
+    bind_addr: 127.0.10.1
+
+log:
+  filename: /tmp/cu.log
+  all_level: warning
 ```
 
-AMF's N2 SCTP socket comes up on `127.0.1.100:38412`, confirmed with:
-
-```bash
-sudo ss -lnp | grep -i sctp
-```
-
-### 2. srsRAN Project — CU and DU
-Built from the `release_24_10_1` tag (commit `ef4b0749a1`). Two processes, run in separate terminals:
+Started with:
 
 ```bash
 ./build/apps/cu/srscu -c configs/cu.yml
+```
+
+F1-C comes up listening on `127.0.10.1`, and the CU registers to the AMF over N2.
+
+### 3. DU
+The shipped example config (`du_rf_b200_tdd_n78_20mhz.yml`) targets a physical USRP B200 over UHD — not usable for a virtual-RF testbed. It was copied to `configs/du_zmq.yml` and the `ru_sdr` block was rebuilt for ZMQ instead of guessing the argument syntax from a different srsRAN version: the actual argument names were confirmed by inspecting `lib/radio/zmq/radio_session_zmq_impl.cpp` and `radio_zmq_baseband_gateway.h` directly in the `ef4b0749a1` source tree, since `--device_args help` on this build doesn't print usage — it proceeds straight into initialization and fails (`ZMQ transmission channel arguments out of bounds`) if the args aren't already correct.
+
+```bash
 ./build/apps/du/srsdu -c configs/du_zmq.yml
 ```
 
-CU-CP listens for F1-C on `127.0.10.1:38472` and connects north to the AMF on `127.0.1.100:38412`. DU connects to the CU-CP on the same F1-C address and comes up with a ZMQ-backed n78 cell (`bw=20 MHz`, `dl_arfcn=650000`, `dl_freq=3750.0 MHz`, `pci=1`, `1T1R`).
+The DU's F1-C client connects to the CU-CP at `127.0.10.1`, and the F1 Setup procedure completes.
 
-### 3. UE
-UERANSIM's `nr-ue` was pointed at the `open5gs-ue.yaml` config (`~/UERANSIM/config/open5gs-ue.yaml`) to attach through the DU/CU pair. Separately, srsRAN_4G's `srsue` was run against a ZMQ config with the NR carrier disabled (`rat.eutra.nof_carriers=0`, `dl_earfcn=3350`) purely to sanity-check the ZMQ loopback plumbing against an LTE stack before trusting the 5G NR results.
+### 4. UE
+UERANSIM's `nr-ue` and srsRAN_4G's `srsue` were both tried against the DU's ZMQ endpoint (TCP ports `2000`/`2001`). Confirming the ZMQ data path is actually established (not just listening) is done with:
 
-### 4. Capturing F1
 ```bash
-sudo tcpdump -i lo -nn -s 0 -w ~/f1ap_live.pcap 'sctp port 38472'
+ss -tnp | grep -E '2000|2001'
 ```
-(Writing to `/tmp` failed with `Permission denied` under the sudo tcpdump context on this box — redirected the capture to the home directory instead.)
 
 ## Results
 
-- Full SCTP four-way association (INIT / INIT ACK / COOKIE ECHO / COOKIE ACK) between DU (`127.0.10.2:37628`) and CU-CP (`127.0.10.1:38472`).
-- `F1SetupRequest` (246 bytes) and `F1SetupResponse` (118 bytes) captured and decoded in Wireshark, including the `gNB-DU-Name` (`srsdu0`) and `gNB-CU-Name` (`cu_cp_01`) IEs.
-- Periodic SCTP HEARTBEAT/HEARTBEAT ACK keeping the association alive.
-- F1-U (GTP-U) capture came back empty for the `gtp` filter — see `docs/PROJECT_REPORT.md` for why that's a meaningful negative result, not a capture bug.
+- **F1-C SCTP association**: established between DU and CU-CP, evidence in `docs/f1c_sctp_connection.txt` and `docs/sctp_connections.txt`.
+- **F1SetupRequest / F1SetupResponse**: captured in `captures/f1ap_live.pcap`, summarised in `docs/f1ap_packet_summary.txt`.
+- **UE-context signalling**: **not captured**. The UE (tested with both UERANSIM and srsUE) did not complete attach — srsUE remained at `Attaching UE...`, and UERANSIM hit a cell-selection failure against the ZMQ cell configuration. Because UE-context procedures (`UEContextSetup`, etc.) only fire after a UE reaches RRC-connected state, this signalling could not be captured in this run. This is documented as a known limitation rather than claimed as complete.
+- **F1-U / GTP-U**: not observed, for the same reason — no PDU session was ever established without a successful UE attach.
 
-Full byte-level walkthrough, the functional-split explanation, and the config-parsing error hit along the way are in [`docs/PROJECT_REPORT.md`](docs/PROJECT_REPORT.md).
+## Known limitation
+
+The project brief asks for both **F1AP setup** and **UE-context signalling**. Only the F1 Setup procedure (CU–DU association) was successfully captured and analysed. UE attach troubleshooting is ongoing — cell configuration mismatches between the DU's `cell_cfg` and the UE's expected parameters are the current suspect, along with confirming the ZMQ TCP session between UE and DU is actually carrying IQ samples rather than just listening.
+
+## Secrets handling
+
+The real `open5gs-ue.yaml` (containing subscriber `key`/`op` values) is **not** included in this repo. Only `configs/open5gs-ue.example.yaml` is committed, with `key`/`op` replaced by `<REDACTED>`. `.gitignore` explicitly excludes `open5gs-ue.yaml`, `*.pcapng`, `*.log`, and other local artifacts.
 
 ## References
 
-See [`docs/REFERENCES.md`](docs/REFERENCES.md).
+- 3GPP TS 38.401 / TS 38.470 / TS 38.473 — NG-RAN architecture, F1 general aspects, F1AP
+- O-RAN Alliance Architecture Description — RU/DU/CU functional splits
+- srsRAN Project documentation (https://docs.srsran.com)
+- UERANSIM documentation (https://github.com/aligungr/UERANSIM)
+- Open5GS documentation (https://open5gs.org/open5gs/docs/)
+- RFC 4960 — Stream Control Transmission Protocol
